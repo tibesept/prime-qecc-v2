@@ -37,7 +37,7 @@ class ArchimideanTerm:
             # f(x) is evaluated additively, and the denominator (exp(x) - 1) 
             # is compensated by exp(x/2) factors to handle singularities.
             num = f(x) * mpmath.exp(x/2) + f(-x) * mpmath.exp(-x/2) - 2 * f_of_0
-            den = abs(mpmath.exp(x) - 1)
+            den = abs(mpmath.exp(x) - mpmath.exp(-x))
             return num / den
 
         part2 = mpmath.quad(integrand, [0, mpmath.mpf('1e-5'), 1, 10, mpmath.inf])
