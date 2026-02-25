@@ -40,7 +40,7 @@ def main():
     # Step 3 and 4: Run Experiments (Tree is built inside)
     print("\n[STEP 3 & 4] Running Zeta Resonance Experiments...")
     results_weil = WeilGraphConnection.experiment_robustness(
-        gammas, None, sigma_values=[1.0, 1.5, 2.0]
+        gammas, None, sigma_values=[0.3, 0.5, 0.8, 1.0, 1.2]
     )
 
     results_graph = WeilGraphConnection.experiment_graph_weight_assignment(
