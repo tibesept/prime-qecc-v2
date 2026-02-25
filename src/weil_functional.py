@@ -62,28 +62,29 @@ class WeilFunctional:
         pole_term_value = 2 * sigma * mpmath.sqrt(mpmath.pi) * mpmath.exp((sigma**2) / 4)
         w_poles = 2 * pole_term_value  # Sum of contributions from i/2 and -i/2
 
-        if verbose:
-            print(f"[4/4] Pole contributions: W_poles = {float(w_poles):.6e}")
+        W_f_geom = w_poles - w_arch - w_primes
+        
+        W_f_spec = w_zeros
 
-        # Mathematical balance of the Explicit Formula:
-        # W_zeros(f) = W_poles(f) - W_arch(f) - W_primes(f)
-        # The discrepancy (Weil functional) W(f) should be non-negative for test functions f*f*:
-        w_total = w_poles - w_arch - w_primes - w_zeros
+        identity_error = abs(W_f_geom - W_f_spec)
 
         if verbose:
             print("-" * 60)
-            print(f"W_TOTAL = {float(w_total):.6e}")
-            print(f"Sign: {'✓ POSITIVE (RH likely)' if w_total >= -1e-10 else '✗ NEGATIVE (RH violated)'}")
+            print(f"W(f) via Geometry = {float(W_f_geom):.6e}")
+            print(f"W(f) via Spectrum = {float(W_f_spec):.6e}")
+            print(f"Identity Error    = {float(identity_error):.6e}")
+            print(f"Weil Positivity   : {'✓ POSITIVE (RH likely)' if W_f_geom >= -1e-10 else '✗ NEGATIVE (RH violated)'}")
             print("=" * 60)
 
-        return w_total, {
+        return W_f_geom, {
             'W_archimedean': w_arch,
             'W_zeros': w_zeros,
             'W_primes': w_primes,
             'W_poles': w_poles,
-            'p_contributions': p_contributions,
-            'W_total': w_total,
+            'W_total': W_f_geom,
+            'identity_error': identity_error,
             'sigma': sigma,
             'num_gammas': len(gammas),
             'num_primes': num_primes
         }
+

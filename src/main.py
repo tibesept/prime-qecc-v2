@@ -35,7 +35,7 @@ def main():
     # Step 2: Compute Weil Functional
     print("[STEP 2] Computing Weil functional...")
     # Using 500 primes for a fast demonstration
-    w_total, components = WeilFunctional.compute(gammas, sigma=mpmath.mpf(1.0), num_primes=500, verbose=True)
+    w_total, components = WeilFunctional.compute(gammas, sigma=mpmath.mpf(0.1), num_primes=500, verbose=True)
 
     # Step 3 and 4: Run Experiments (Tree is built inside)
     print("\n[STEP 3 & 4] Running Zeta Resonance Experiments...")
