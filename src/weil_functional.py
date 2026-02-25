@@ -55,7 +55,20 @@ class WeilFunctional:
         if verbose:
             print(f"[3/3] Primes term: W_primes = {float(w_primes):.6e}")
 
-        w_total = w_arch + w_primes - w_zeros
+        # Poles of the Riemann zeta function at s=0 and s=1 correspond to gamma = i/2 and -i/2.
+        # The Fourier transform of our Gaussian test function: 
+        # f_hat(t) = 2 * sigma * sqrt(pi) * exp(-(sigma * t)^2)
+        # Evaluated at t = ±i/2 (so t^2 = -1/4).
+        pole_term_value = 2 * sigma * mpmath.sqrt(mpmath.pi) * mpmath.exp((sigma**2) / 4)
+        w_poles = 2 * pole_term_value  # Sum of contributions from i/2 and -i/2
+
+        if verbose:
+            print(f"[4/4] Pole contributions: W_poles = {float(w_poles):.6e}")
+
+        # Mathematical balance of the Explicit Formula:
+        # W_zeros(f) = W_poles(f) - W_arch(f) - W_primes(f)
+        # The discrepancy (Weil functional) W(f) should be non-negative for test functions f*f*:
+        w_total = w_poles - w_arch - w_primes - w_zeros
 
         if verbose:
             print("-" * 60)
@@ -67,6 +80,7 @@ class WeilFunctional:
             'W_archimedean': w_arch,
             'W_zeros': w_zeros,
             'W_primes': w_primes,
+            'W_poles': w_poles,
             'p_contributions': p_contributions,
             'W_total': w_total,
             'sigma': sigma,
