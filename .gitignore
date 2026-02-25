@@ -5,6 +5,8 @@ riemann_zeros.json
 dashboard.html
 weil_components.html
 
+test_debug.py
+
 __pycache__/
 *.pyc
 *.pyo
