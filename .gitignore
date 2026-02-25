@@ -1,7 +1,5 @@
 zeta_zeros.txt
 riemann_zeros.json
-*.json
-*.txt
 
 *.html
 dashboard.html
