@@ -62,7 +62,7 @@ class PrimesContribution:
                 term = p_power * (f_pos + f_neg)
                 inner_sum += term
                 
-                if term < mpmath.mpf(10) ** (-mpmath.mp.dps):
+                if abs(term) < mpmath.mpf(10) ** (-mpmath.mp.dps):
                     break
                     
             prime_term = log_p * inner_sum
@@ -70,7 +70,7 @@ class PrimesContribution:
             p_contributions[int(p)] = float(prime_term)
             
             # Since f has exponential decay, outer sum also converges. Break early if contribution vanishes.
-            if prime_term < mpmath.mpf(10) ** (-mpmath.mp.dps):
+            if abs(prime_term) < mpmath.mpf(10) ** (-mpmath.mp.dps):
                 break
                 
         return total, p_contributions
