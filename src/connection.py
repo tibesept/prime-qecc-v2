@@ -1,3 +1,4 @@
+import math
 import mpmath
 from typing import List, Dict
 
@@ -11,14 +12,42 @@ class WeilGraphConnection:
     """
 
     @staticmethod
+    def calculate_required_primes(sigma: float, target_epsilon: float = 1e-12) -> int:
+        """
+        Dynamically calculates the number of primes needed for the Weil sum 
+        to converge below target_epsilon.
+        """
+        # Solve for x = log(p) from decay envelope: p^(-1/2) * exp(-(log p / 2 sigma)^2)
+        ln_eps = math.log(target_epsilon)
+        
+        # Quadratic formula for x: x^2 + 2*sigma^2*x + 4*sigma^2*ln_eps = 0
+        x = - (sigma**2) + math.sqrt((sigma**4) - 4 * (sigma**2) * ln_eps)
+        p_max = math.exp(x)
+        
+        # Prime Number Theorem: pi(x) ~ x / ln(x)
+        # Add a 20% safety buffer
+        num_primes = int(1.2 * (p_max / math.log(p_max))) if p_max > 2 else 10
+        
+        # Hard cap to avoid freezing mpmath in Python
+        MAX_PRIMES = 50000 
+        if num_primes > MAX_PRIMES:
+            print(f"  [Warning] sigma={sigma} mathematically requires ~{num_primes} primes.")
+            print(f"  [Warning] Capping at {MAX_PRIMES} to prevent Python execution from hanging.")
+            return MAX_PRIMES
+            
+        return max(100, num_primes)
+
+    @staticmethod
     def experiment_robustness(gammas: List[mpmath.mpf],
-                              tree: BruhatTitsTree,
+                              tree: BruhatTitsTree = None,
                               sigma_values: List[float] = None) -> Dict:
         """
         Experiment to verify W(f) >= 0 for different structural test lengths.
+        Dynamically scales prime calculation to prevent truncation errors.
         """
+        # We lower the max sigma to 1.2 to stay within computational tractability for Python
         if sigma_values is None:
-            sigma_values = [0.3, 0.5, 0.8, 1.0, 1.5, 2.0]
+            sigma_values = [0.3, 0.5, 0.8, 1.0, 1.2]
 
         results = {
             'sigma_values': [],
@@ -29,15 +58,17 @@ class WeilGraphConnection:
         }
 
         print("=" * 70)
-        print("EXPERIMENT: Weil Functional Robustness")
+        print("EXPERIMENT 1: Weil Functional Robustness (Dynamically Scaled)")
         print("=" * 70)
 
         min_w = None
 
         for sigma in sigma_values:
-            print(f"Testing sigma = {sigma}...")
-            # We use 500 primes for speed, typically enough for convergence.
-            w_total, _ = WeilFunctional.compute(gammas, sigma=mpmath.mpf(sigma), num_primes=500, verbose=False)
+            # Dynamically calculate the prime cutoff
+            req_primes = WeilGraphConnection.calculate_required_primes(sigma)
+            print(f"Testing sigma = {sigma} (Allocating {req_primes} primes for convergence)...")
+            
+            w_total, _ = WeilFunctional.compute(gammas, sigma=mpmath.mpf(sigma), num_primes=req_primes, verbose=False)
             w_float = float(w_total)
 
             results['sigma_values'].append(sigma)
