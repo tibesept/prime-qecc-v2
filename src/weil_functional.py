@@ -81,6 +81,7 @@ class WeilFunctional:
             'W_zeros': w_zeros,
             'W_primes': w_primes,
             'W_poles': w_poles,
+            'p_contributions': p_contributions,
             'W_total': W_f_geom,
             'identity_error': identity_error,
             'sigma': sigma,
