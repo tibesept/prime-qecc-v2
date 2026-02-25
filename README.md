@@ -38,6 +38,14 @@ This is not a proof of anything. It is an attempt to see if the
 analogy holds up computationally before asking whether it can be
 made rigorous.
 
+## 📖 Theoretical Framework
+
+While the Python code in this repository models the anomaly heuristically using scalar graph weights, the actual physical mapping requires formal operator-algebraic structures.
+
+To see the rigorous mathematical formulation of how a Weil anomaly ($\delta_p$) geometrically translates into a non-unitary deformation operator ($e^{-\alpha \delta_p K_p}$) and destroys the exact isometry of a p-adic Holographic Quantum Error Correcting Code, please read the formal theoretical breakdown:
+
+> **[Read the Formal Theoretical Framework (THEORY.md)](THEORY.md)**
+
 ## Project Structure
 
 - `data/` : Caches for Riemann zeros data.
