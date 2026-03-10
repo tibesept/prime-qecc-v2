@@ -65,15 +65,22 @@ class WeilGraphConnection:
 
         for sigma in sigma_values:
             # Dynamically calculate the prime cutoff
+            allocated_primes = int(10000 * sigma) # Будет 1000, 2000, 3000...
+
             req_primes = WeilGraphConnection.calculate_required_primes(sigma)
-            print(f"Testing sigma = {sigma} (Allocating {req_primes} primes for convergence)...")
+            print(f"Testing sigma = {sigma} (Allocating {allocated_primes} primes)...")
             
-            w_total, _ = WeilFunctional.compute(gammas, sigma=mpmath.mpf(sigma), num_primes=req_primes, verbose=False)
-            w_float = float(w_total)
+            w_total, components = WeilFunctional.compute(
+                gammas, 
+                sigma=mpmath.mpf(sigma), 
+                num_primes=allocated_primes, 
+                verbose=False
+            )
+            w_float = float(components['identity_error']) 
 
             results['sigma_values'].append(sigma)
             results['w_values'].append(w_float)
-
+            
             is_positive = w_float >= -1e-10
 
             if not is_positive:

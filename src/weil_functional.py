@@ -3,18 +3,14 @@ from weil_archimedean import ArchimideanTerm
 from weil_zeros import ZerosContribution
 from weil_primes import PrimesContribution
 
-
 class WeilFunctional:
     """
     Computes the full Weil explicit formula functional:
-    W(f) = W_R(f) + W_zeros(f) + W_primes(f)
+    W_zeros(f) = W_poles(f) - W_arch(f) - W_primes(f)
     """
 
     @staticmethod
     def gaussian_testfunc(sigma: mpmath.mpf = 1):
-        """
-        Returns a tuple (f, f_hat) for a test Gaussian.
-        """
         sigma = mpmath.mpf(sigma)
 
         def f(u):
@@ -22,17 +18,15 @@ class WeilFunctional:
             return mpmath.exp(-(u / (2 * sigma)) ** 2)
 
         def f_hat(t):
-            return ZerosContribution.gaussian_fourier_transform(t, sigma)
+            t = mpmath.mpf(t)
+            # ПРАВИЛЬНЫЙ Фурье-образ с множителем 2
+            return 2 * sigma * mpmath.sqrt(mpmath.pi) * mpmath.exp(-(sigma * t) ** 2)
 
         return f, f_hat
 
     @staticmethod
     def compute(gammas, sigma=1, num_primes=500, verbose=True):
-        """
-        Computes the full Weil functional value.
-        """
         sigma = mpmath.mpf(sigma)
-        f, f_hat = WeilFunctional.gaussian_testfunc(sigma)
 
         if verbose:
             print("=" * 60)
@@ -40,52 +34,54 @@ class WeilFunctional:
             print(f"Sigma: {sigma}, Precision (dps): {mpmath.mp.dps}")
             print("=" * 60)
 
-        # 1. Archimedean term W_R(f)
-        w_arch = ArchimideanTerm.compute(f)
-        if verbose:
-            print(f"[1/3] Archimedean term: W_R = {float(w_arch):.6e}")
+        f, f_hat = WeilFunctional.gaussian_testfunc(sigma)
 
-        # 2. Zeros term W_zeros(f)
-        w_zeros = ZerosContribution.compute(gammas, sigma)
-        if verbose:
-            print(f"[2/3] Riemann zeros term: W_zeros = {float(w_zeros):.6e}")
+        # 1. Zeros (Спектр) - теперь f_hat правильный, поэтому внутри Zeros просто суммируем f_hat
+        w_zeros = mpmath.mpf(0)
+        for g in gammas:
+            gamma = mpmath.mpf(g)
+            # Сумма по +gamma и -gamma
+            w_zeros += 2 * f_hat(gamma)
 
-        # 3. Primes term W_primes(f)
+        # 2. Archimedean (Передаем f_hat)
+        w_arch = ArchimideanTerm.compute(f_hat)
+
+        # 3. Primes (Ожидаем кортеж)
         w_primes, p_contributions = PrimesContribution.compute(f, num_primes)
-        if verbose:
-            print(f"[3/3] Primes term: W_primes = {float(w_primes):.6e}")
 
-        # Poles of the Riemann zeta function at s=0 and s=1 correspond to gamma = i/2 and -i/2.
-        # The Fourier transform of our Gaussian test function: 
-        # f_hat(t) = 2 * sigma * sqrt(pi) * exp(-(sigma * t)^2)
-        # Evaluated at t = ±i/2 (so t^2 = -1/4).
-        pole_term_value = 2 * sigma * mpmath.sqrt(mpmath.pi) * mpmath.exp((sigma**2) / 4)
-        w_poles = 2 * pole_term_value  # Sum of contributions from i/2 and -i/2
+        # 4. Poles: f_hat(i/2) + f_hat(-i/2)
+        # f_hat(i/2) = 2 * sigma * sqrt(pi) * exp(sigma^2 / 4)
+        # Сумма для i/2 и -i/2 дает удвоение:
+        w_poles = 4 * sigma * mpmath.sqrt(mpmath.pi) * mpmath.exp((sigma**2) / 4)
 
-        W_f_geom = w_poles - w_arch - w_primes
-        
-        W_f_spec = w_zeros
+        # 5. Баланс (Геометрия)
+        w_geom = w_poles - w_arch - w_primes
 
-        identity_error = abs(W_f_geom - W_f_spec)
+        # 6. Ошибка тождества
+        identity_error = abs(w_geom - w_zeros)
 
         if verbose:
             print("-" * 60)
-            print(f"W(f) via Geometry = {float(W_f_geom):.6e}")
-            print(f"W(f) via Spectrum = {float(W_f_spec):.6e}")
-            print(f"Identity Error    = {float(identity_error):.6e}")
-            print(f"Weil Positivity   : {'✓ POSITIVE (RH likely)' if W_f_geom >= -1e-10 else '✗ NEGATIVE (RH violated)'}")
+            print(f"W_poles          = {float(w_poles):.10e}")
+            print(f"W_arch           = {float(w_arch):.10e}")
+            print(f"W_primes         = {float(w_primes):.10e}")
+            print("-" * 60)
+            print(f"W(f) Zeros (LHS) = {float(w_zeros):.10e}")
+            print(f"W(f) Geom  (RHS) = {float(w_geom):.10e}")
+            print(f"Identity Error   = {float(identity_error):.10e}")
             print("=" * 60)
 
-        return W_f_geom, {
+        w_total = w_geom
+
+        return w_total, {
             'W_archimedean': w_arch,
             'W_zeros': w_zeros,
             'W_primes': w_primes,
             'W_poles': w_poles,
             'p_contributions': p_contributions,
-            'W_total': W_f_geom,
+            'W_total': w_total,
             'identity_error': identity_error,
-            'sigma': sigma,
+            'sigma': float(sigma),
             'num_gammas': len(gammas),
             'num_primes': num_primes
         }
-
