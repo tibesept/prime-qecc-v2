@@ -14,14 +14,23 @@ def test_zeros_loading():
     """
     loader = RiemannZerosLoader()
     gammas = loader.load_odlyzko(num_zeros=10, dps=50)
+    info = loader.get_last_load_info()
     
     assert len(gammas) == 10
     
     # Check typing
     assert all(isinstance(g, mpmath.mpf) for g in gammas)
     
-    # Check verification explicitly
-    assert loader.verify_first_five(gammas)
+    # Precision metadata should be available
+    assert "precision_digits" in info
+    assert int(info["precision_digits"]) >= 30
+    assert str(info["source"]).startswith("mpmath")
+
+    # Source-aware verification should pass
+    assert loader.verify_first_five(gammas, source_info=info)
+
+    # Very strict tolerance should fail for finite-precision reference constants
+    assert not loader.verify_first_five(gammas, tolerance=mpmath.mpf("1e-40"), source_info=info)
 
 
 if __name__ == "__main__":

@@ -5,8 +5,8 @@ from typing import Dict, Tuple
 class BruhatTitsTree:
     """
     Constructs a finite piece of the Bruhat-Tits tree for field Q_p.
-    Provides visualization assuming the Weil functional hypothesis connects unit weights to signs.
-    CONJECTURAL: Assignment of negative edge weights to model 'broken' unitarity.
+    Provides geometric visualization with scalar edge weights.
+    This class is not an operator-level unitarity test.
     """
     
     def __init__(self, p: int = 2, depth: int = 5):
@@ -56,10 +56,8 @@ class BruhatTitsTree:
 
     def assign_edge_weights_from_weil(self, p_contribution: float):
         """
-        Assigns weights to edges based on the local Weil Functional contribution W_p.
-        Our Toy Hypothesis (v3.0): 
-        If W_p remains sufficiently positive -> physical tree, positive weights.
-        If W_p becomes negative (due to resonance with a shifted zero) -> unitarity break, negative weights.
+        Assigns scalar edge weights based on a supplied contribution value.
+        Negative weights are treated as a visualization artifact only.
         """
         for u, v in self.graph.edges():
             base_weight = np.log(self.p)
@@ -73,7 +71,7 @@ class BruhatTitsTree:
                 
             self.graph[u][v]['weight'] = weight
 
-    def measure_unitarity_violation(self) -> float:
+    def measure_negative_edge_fraction(self) -> float:
         """
         Returns fraction of negative edges.
         """
@@ -82,6 +80,12 @@ class BruhatTitsTree:
         if total_edges == 0:
             return 0.0
         return negative_count / total_edges
+
+    def measure_unitarity_violation(self) -> float:
+        """
+        Backward-compatible alias. Use measure_negative_edge_fraction instead.
+        """
+        return self.measure_negative_edge_fraction()
 
     def visualize(self, filename: str = "tree.html"):
         """

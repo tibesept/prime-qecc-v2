@@ -5,6 +5,8 @@ import unittest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
 from bruhat_tits import BruhatTitsTree
+from connection import WeilGraphConnection
+from data_loader import RiemannZerosLoader
 
 class TestBruhatTitsTree(unittest.TestCase):
     def test_tree_construction_p2_d3(self):
@@ -24,6 +26,19 @@ class TestBruhatTitsTree(unittest.TestCase):
         for node, level in tree.node_level.items():
             if level == 1:
                 self.assertEqual(graph.degree(node), p + 1)
+
+    def test_no_forced_negative_weights(self):
+        loader = RiemannZerosLoader()
+        gammas = loader.load_odlyzko(num_zeros=120, dps=50)
+        result = WeilGraphConnection.experiment_graph_weight_assignment(gammas, sigma=1.0, num_primes=40)
+
+        resonance = result["resonance_prime"]
+        w_broken = result["prime_data"][resonance]["w_broken"]
+        neg_fraction = result["broken_negative_edge_fraction"]
+
+        # If the computed broken contribution is positive, tree should not be force-flipped.
+        if w_broken > 0:
+            self.assertEqual(neg_fraction, 0.0)
 
 if __name__ == '__main__':
     unittest.main()
