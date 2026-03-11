@@ -22,9 +22,10 @@ Implemented components are intentionally separated:
 - no operator-level unitarity claim from tree edge signs
 
 3. Intrinsic transfer-kernel test:
-- prime-space transfer/Choi candidate built directly from the functional pairing `rho <-> 1-rho`
-- healthy critical-line spectra produce an approximately Hermitian positive-type kernel
-- synthetic off-line shifts can make that same kernel cease to be a valid CP candidate
+- prime-space kernel built directly from the functional pairing `rho <-> 1-rho`
+- the kernel is trace-normalized and interpreted as a state / `1 -> N` channel candidate
+- broken spectra use symmetry-complete upper-half replacements, not a single injected off-line zero
+- large synthetic off-line shifts can make that same kernel cease to be positive semidefinite
 
 4. Operator ansatz:
 - a seeded isometric tensor `T0`

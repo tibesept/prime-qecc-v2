@@ -109,12 +109,15 @@ class TensorDeformationAnsatz:
 
 class PrimeFunctionalTransfer:
     """
-    Builds a prime-space transfer/Choi candidate directly from prime modes and the
-    functional-equation pairing rho <-> 1-rho.
+    Builds a prime-space kernel directly from prime modes and the functional-equation
+    pairing rho <-> 1-rho.
 
     On the critical line, 1-rho = conjugate(rho), so the kernel is of Gram type.
-    Off the line, that identity fails and the same construction can stop being a
-    valid Hermitian PSD Choi candidate.
+    After unit-trace normalization, that gives a valid state / 1->N channel candidate.
+
+    Off the line, the same construction can stop being positive semidefinite even if
+    Hermiticity is preserved. The kernel is accumulated with mpmath precision so the
+    input zero precision is not immediately collapsed to float64.
     """
 
     def __init__(self, primes: Sequence[int], bandwidth: float = 0.25):
@@ -122,61 +125,117 @@ class PrimeFunctionalTransfer:
             raise ValueError("At least one prime is required.")
 
         self.primes = [int(p) for p in primes]
-        self.bandwidth = float(bandwidth)
-        self.logs = np.array([float(mpmath.log(p)) for p in self.primes], dtype=np.float64)
-        self.weights = np.array(
-            [
-                float(
-                    (mpmath.log(p) / mpmath.sqrt(p))
-                    * mpmath.exp(-(self.bandwidth * mpmath.log(p)) ** 2)
-                )
-                for p in self.primes
-            ],
-            dtype=np.complex128,
-        )
+        self.bandwidth = mpmath.mpf(bandwidth)
+        self.logs = [mpmath.log(p) for p in self.primes]
+        self.weights = [
+            (log_p / mpmath.sqrt(p)) * mpmath.exp(-(self.bandwidth * log_p) ** 2)
+            for p, log_p in zip(self.primes, self.logs)
+        ]
 
     @staticmethod
-    def spectral_parameter(rho: complex) -> complex:
-        return complex(-1j * (complex(rho) - 0.5))
+    def spectral_parameter(rho: complex) -> mpmath.mpc:
+        return -mpmath.j * (mpmath.mpc(rho) - mpmath.mpf("0.5"))
 
-    def prime_mode_vector(self, rho: complex) -> np.ndarray:
+    def prime_mode_vector(self, rho: complex) -> List[mpmath.mpc]:
         tau = self.spectral_parameter(rho)
-        return self.weights * np.exp(-1j * tau * self.logs)
+        return [
+            weight * mpmath.exp(-mpmath.j * tau * log_p)
+            for weight, log_p in zip(self.weights, self.logs)
+        ]
 
-    def transfer_kernel(self, rhos: Sequence[complex]) -> np.ndarray:
-        kernel = np.zeros((len(self.primes), len(self.primes)), dtype=np.complex128)
+    @staticmethod
+    def _trace(kernel: mpmath.matrix) -> mpmath.mpc:
+        return sum(kernel[i, i] for i in range(kernel.rows))
+
+    @staticmethod
+    def _adjoint(kernel: mpmath.matrix) -> mpmath.matrix:
+        adjoint = mpmath.matrix(kernel.cols, kernel.rows)
+        for i in range(kernel.rows):
+            for j in range(kernel.cols):
+                adjoint[j, i] = mpmath.conj(kernel[i, j])
+        return adjoint
+
+    @staticmethod
+    def _frobenius_norm(kernel: mpmath.matrix) -> mpmath.mpf:
+        total = mpmath.mpf("0")
+        for i in range(kernel.rows):
+            for j in range(kernel.cols):
+                total += abs(kernel[i, j]) ** 2
+        return mpmath.sqrt(total)
+
+    @staticmethod
+    def _scale(kernel: mpmath.matrix, scalar: mpmath.mpf) -> mpmath.matrix:
+        scaled = mpmath.matrix(kernel.rows, kernel.cols)
+        for i in range(kernel.rows):
+            for j in range(kernel.cols):
+                scaled[i, j] = kernel[i, j] / scalar
+        return scaled
+
+    def transfer_kernel(self, rhos: Sequence[complex]) -> mpmath.matrix:
+        n_primes = len(self.primes)
+        kernel = mpmath.matrix(n_primes, n_primes)
         for rho in rhos:
             v_rho = self.prime_mode_vector(rho)
-            v_pair = self.prime_mode_vector(1 - complex(rho))
-            kernel += np.outer(v_rho, v_pair)
+            v_pair = self.prime_mode_vector(1 - mpmath.mpc(rho))
+            for i in range(n_primes):
+                for j in range(n_primes):
+                    kernel[i, j] += v_rho[i] * v_pair[j]
         return kernel
 
     @staticmethod
-    def normalize_by_trace(kernel: np.ndarray) -> np.ndarray:
-        trace_val = np.trace(kernel)
-        scale = float(np.real(trace_val))
-        if abs(scale) < 1e-14:
+    def normalize_by_trace(kernel: mpmath.matrix) -> mpmath.matrix:
+        trace_val = PrimeFunctionalTransfer._trace(kernel)
+        scale = mpmath.re(trace_val)
+        if abs(scale) < mpmath.mpf("1e-30"):
             return kernel
-        return kernel / scale
+        return PrimeFunctionalTransfer._scale(kernel, scale)
 
     def diagnostics_from_rhos(self, rhos: Sequence[complex], tol: float = 1e-10) -> Dict[str, float]:
+        tol_mp = mpmath.mpf(tol)
         kernel = self.transfer_kernel(rhos)
         kernel_norm = self.normalize_by_trace(kernel)
-        hermiticity_defect = float(np.linalg.norm(kernel_norm - kernel_norm.conj().T, ord="fro"))
-        hermitian_part = (kernel_norm + kernel_norm.conj().T) / 2
-        hermitian_eigs = np.linalg.eigvalsh(hermitian_part)
-        min_hermitian_eig = float(np.min(hermitian_eigs))
-        max_singular_value = float(np.linalg.norm(kernel_norm, 2))
+        adjoint = self._adjoint(kernel_norm)
+        hermiticity_defect = self._frobenius_norm(kernel_norm - adjoint)
+
+        hermitian_part = (kernel_norm + adjoint) / 2
+        hermitian_eigs = mpmath.eig(hermitian_part, left=False, right=False)
+        min_hermitian_eig = min(mpmath.re(val) for val in hermitian_eigs)
+        max_hermitian_eig = max(mpmath.re(val) for val in hermitian_eigs)
+
+        trace_val = self._trace(kernel)
+        normalized_trace = self._trace(kernel_norm)
+        trace_real = mpmath.re(trace_val)
+        trace_imag = mpmath.im(trace_val)
+        unit_trace_error = abs(normalized_trace - 1)
+
+        trace_normalization_ok = (
+            trace_real > tol_mp
+            and abs(trace_imag) <= tol_mp * max(1, abs(trace_real))
+            and unit_trace_error <= tol_mp
+        )
+        cp_candidate_ok = hermiticity_defect <= tol_mp and min_hermitian_eig >= -tol_mp
+        state_channel_candidate_ok = bool(trace_normalization_ok and cp_candidate_ok)
+
+        failure_mode = "ok"
+        if not trace_normalization_ok:
+            failure_mode = "trace_normalization"
+        elif hermiticity_defect > tol_mp:
+            failure_mode = "non_hermitian"
+        elif min_hermitian_eig < -tol_mp:
+            failure_mode = "negative_eigenvalue"
 
         return {
             "num_primes": len(self.primes),
             "num_rhos": len(rhos),
-            "trace_real": float(np.real(np.trace(kernel))),
-            "trace_imag": float(np.imag(np.trace(kernel))),
-            "hermiticity_defect": hermiticity_defect,
-            "min_hermitian_eigenvalue": min_hermitian_eig,
-            "max_singular_value": max_singular_value,
-            "cp_candidate_ok": bool(hermiticity_defect <= tol and min_hermitian_eig >= -tol),
-            "contractive_candidate_ok": bool(max_singular_value <= 1.0 + tol),
+            "trace_real": float(trace_real),
+            "trace_imag": float(trace_imag),
+            "unit_trace_error": float(unit_trace_error),
+            "trace_normalization_ok": bool(trace_normalization_ok),
+            "hermiticity_defect": float(hermiticity_defect),
+            "min_hermitian_eigenvalue": float(min_hermitian_eig),
+            "max_hermitian_eigenvalue": float(max_hermitian_eig),
+            "cp_candidate_ok": bool(cp_candidate_ok),
+            "state_channel_candidate_ok": state_channel_candidate_ok,
+            "failure_mode": failure_mode,
             "kernel": kernel_norm,
         }

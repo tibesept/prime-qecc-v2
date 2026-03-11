@@ -31,12 +31,17 @@ Then form the functional-pairing kernel
 
 `K_{pq} = sum_rho psi_p(rho) psi_q(1-rho)`
 
-where the sum runs over zeros with positive imaginary part.
+where the sum runs over upper-half-plane zeros.
+
+For a synthetic off-line zero `rho = beta + i gamma`, the upper-half spectrum must also contain
+`1-conj(rho) = 1-beta + i gamma`.
+The code now completes that upper-half orbit explicitly before building the kernel.
 
 Why this matters:
 
 - if `rho = 1/2 + i gamma`, then `1-rho = conjugate(rho)`, so `K` is a Gram-type kernel and is Hermitian positive-type
-- if a zero is shifted off the critical line, `1-rho` is no longer `conjugate(rho)`, and the same construction can cease to define a Hermitian PSD Choi candidate
+- if an upper-half pair `{rho, 1-conj(rho)}` is shifted off the critical line, the normalized kernel can stay Hermitian but still cease to be positive semidefinite
+- after unit-trace normalization, a Hermitian PSD kernel defines a valid state / `1 -> N` channel candidate
 
 This is the closest thing in the repository to an intrinsic answer to the objection "does the transfer operator itself fail, rather than a hand-imposed dictionary?"
 
@@ -77,7 +82,7 @@ This is a modeling choice, not a theorem.
 ## What the Code Can Legitimately Show
 
 - How Weil spectral positivity behaves under synthetic off-line zero perturbations.
-- How a directly derived functional-pairing transfer kernel can stop being a valid Hermitian PSD CP candidate under synthetic off-line zero shifts.
+- How a directly derived, symmetry-complete functional-pairing kernel can stop being a valid unit-trace Hermitian PSD state / `1 -> N` channel candidate under synthetic off-line zero shifts.
 - How a chosen attenuation ansatz affects isometry/trace defects while remaining CP.
 - Whether an imposed coupling map produces monotone or non-monotone trends.
 

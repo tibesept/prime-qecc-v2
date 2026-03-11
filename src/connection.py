@@ -25,16 +25,25 @@ class WeilGraphConnection:
     @staticmethod
     def _positive_imaginary_rhos(
         gammas: List[mpmath.mpf], num_zeros: int, broken_zeros: Optional[Dict[int, complex]] = None
-    ) -> List[complex]:
+    ) -> List[mpmath.mpc]:
         if broken_zeros is None:
             broken_zeros = {}
 
-        rhos: List[complex] = []
+        rhos: List[mpmath.mpc] = []
         for i, gamma in enumerate(gammas[:num_zeros]):
             if i in broken_zeros:
-                rhos.append(complex(broken_zeros[i]))
+                rho = mpmath.mpc(broken_zeros[i])
+                if mpmath.im(rho) <= 0:
+                    raise ValueError("broken_zeros must be supplied in the upper half-plane.")
+
+                rhos.append(rho)
+
+                # For an off-line zero, the upper-half spectrum must also contain 1-conj(rho).
+                partner = 1 - mpmath.conj(rho)
+                if abs(partner - rho) > mpmath.mpf("1e-30"):
+                    rhos.append(partner)
             else:
-                rhos.append(complex(0.5 + 1j * float(gamma)))
+                rhos.append(mpmath.mpc(mpmath.mpf("0.5"), mpmath.mpf(gamma)))
         return rhos
 
     @staticmethod
@@ -227,7 +236,8 @@ class WeilGraphConnection:
         """
         Experiment 4 (intrinsic operator test): builds a prime-space transfer kernel
         directly from the functional-equation pairing rho <-> 1-rho and checks whether
-        the resulting Choi candidate remains Hermitian PSD under synthetic RH violation.
+        the resulting unit-trace state / 1->N channel candidate remains Hermitian PSD
+        under synthetic RH violation.
         """
         if shift_values is None:
             shift_values = [0.1, 0.2, 0.4, 0.8, 1.2]
@@ -238,17 +248,21 @@ class WeilGraphConnection:
         healthy_rhos = WeilGraphConnection._positive_imaginary_rhos(gammas, num_zeros=num_zeros)
         healthy = transfer.diagnostics_from_rhos(healthy_rhos)
 
-        gamma_1 = float(mpmath.im(mpmath.zetazero(1)))
+        gamma_1 = mpmath.im(mpmath.zetazero(1))
         scan_results = []
         for delta in shift_values:
+            rho_broken = mpmath.mpc(mpmath.mpf("0.5") - mpmath.mpf(delta), gamma_1)
             broken_rhos = WeilGraphConnection._positive_imaginary_rhos(
                 gammas,
                 num_zeros=num_zeros,
-                broken_zeros={0: complex(0.5 - delta + 1j * gamma_1)},
+                broken_zeros={0: rho_broken},
             )
             diagnostics = transfer.diagnostics_from_rhos(broken_rhos)
             diagnostics["delta"] = float(delta)
-            diagnostics["rho_broken"] = str(complex(0.5 - delta + 1j * gamma_1))
+            diagnostics["rho_broken"] = (
+                f"{mpmath.nstr(mpmath.re(rho_broken), 20)}"
+                f"+{mpmath.nstr(mpmath.im(rho_broken), 20)}j"
+            )
             scan_results.append(diagnostics)
 
         return {
@@ -258,7 +272,10 @@ class WeilGraphConnection:
             "primes": primes,
             "healthy": healthy,
             "scan_results": scan_results,
-            "first_failure": next((r for r in scan_results if not r["cp_candidate_ok"]), None),
+            "first_failure": next(
+                (r for r in scan_results if not r["state_channel_candidate_ok"]),
+                None,
+            ),
         }
 
     @staticmethod

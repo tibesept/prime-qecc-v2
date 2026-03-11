@@ -102,12 +102,13 @@ def main():
     first_failure = results_intrinsic["first_failure"]
     if first_failure:
         print(
-            "  Intrinsic kernel first CP-candidate failure at "
+            "  Intrinsic kernel first state-channel failure at "
             f"delta={first_failure['delta']:.2f} "
-            f"(Hermiticity defect={first_failure['hermiticity_defect']:.3e})"
+            f"({first_failure['failure_mode']}, "
+            f"min eig={first_failure['min_hermitian_eigenvalue']:.3e})"
         )
     else:
-        print("  Intrinsic kernel remained a valid CP candidate on the tested shift set.")
+        print("  Intrinsic kernel remained a valid unit-trace state candidate on the tested shift set.")
     print(f"  Tensor isometry defect delta=0:   {d0['isometry_defect']:.3e}")
     print(f"  Tensor isometry defect delta=max: {d_last['isometry_defect']:.3e}")
     print("=" * 70)

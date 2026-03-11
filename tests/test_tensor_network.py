@@ -3,6 +3,8 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
+import mpmath
+
 from connection import WeilGraphConnection
 from data_loader import RiemannZerosLoader
 from tensor_network import PrimeFunctionalTransfer, TensorDeformationAnsatz
@@ -52,14 +54,52 @@ def test_intrinsic_transfer_kernel_detects_invalid_cp_candidate():
     )
 
     assert result["healthy"]["cp_candidate_ok"]
+    assert result["healthy"]["state_channel_candidate_ok"]
     assert result["healthy"]["hermiticity_defect"] < 1e-8
 
     first_broken = result["scan_results"][0]
-    assert first_broken["hermiticity_defect"] > 1e-6
-    assert not first_broken["cp_candidate_ok"]
+    assert first_broken["hermiticity_defect"] < 1e-8
+    assert first_broken["cp_candidate_ok"]
+    assert first_broken["state_channel_candidate_ok"]
 
     worst = result["scan_results"][-1]
+    assert worst["hermiticity_defect"] < 1e-8
     assert worst["min_hermitian_eigenvalue"] < 0
+    assert worst["failure_mode"] == "negative_eigenvalue"
+    assert not worst["state_channel_candidate_ok"]
+
+
+def test_intrinsic_transfer_kernel_completes_upper_half_orbit():
+    gamma_1 = mpmath.mpf("14.13472514173469379045725198356247027078")
+    broken = WeilGraphConnection._positive_imaginary_rhos(
+        [gamma_1, 21.02203963877155499262847959389690277733],
+        num_zeros=2,
+        broken_zeros={0: mpmath.mpc("0.3", gamma_1)},
+    )
+
+    assert len(broken) == 3
+    assert any(abs(rho - mpmath.mpc("0.3", gamma_1)) < mpmath.mpf("1e-30") for rho in broken)
+    assert any(abs(rho - mpmath.mpc("0.7", gamma_1)) < mpmath.mpf("1e-30") for rho in broken)
+
+
+def test_intrinsic_upper_half_spectrum_retains_mpmath_precision():
+    mpmath.mp.dps = 80
+    gamma_1 = mpmath.mpf("14.134725141734693790457251983562470270784257115699243175685567")
+    mpc_type = type(mpmath.mpc(0))
+
+    healthy = WeilGraphConnection._positive_imaginary_rhos([gamma_1], num_zeros=1)
+    broken = WeilGraphConnection._positive_imaginary_rhos(
+        [gamma_1],
+        num_zeros=1,
+        broken_zeros={0: mpmath.mpc("0.3", gamma_1)},
+    )
+
+    assert all(isinstance(rho, mpc_type) for rho in healthy + broken)
+    assert abs(mpmath.im(healthy[0]) - gamma_1) < mpmath.mpf("1e-40")
+    assert abs(mpmath.re(broken[0]) - mpmath.mpf("0.3")) < mpmath.mpf("1e-40")
+    assert abs(mpmath.im(broken[0]) - gamma_1) < mpmath.mpf("1e-40")
+    assert abs(mpmath.re(broken[1]) - mpmath.mpf("0.7")) < mpmath.mpf("1e-40")
+    assert abs(mpmath.im(broken[1]) - gamma_1) < mpmath.mpf("1e-40")
 
 
 def test_prime_functional_transfer_healthy_kernel_is_gram_like():
@@ -67,4 +107,5 @@ def test_prime_functional_transfer_healthy_kernel_is_gram_like():
     rhos = [0.5 + 1j * g for g in [14.1347251417, 21.0220396388, 25.0108575801]]
     diag = transfer.diagnostics_from_rhos(rhos)
     assert diag["cp_candidate_ok"]
-    assert diag["contractive_candidate_ok"]
+    assert diag["state_channel_candidate_ok"]
+    assert diag["unit_trace_error"] < 1e-12
